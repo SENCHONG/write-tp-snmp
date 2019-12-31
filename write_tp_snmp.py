@@ -2,11 +2,10 @@
 
 import configparser
 import json
-import snmp
+from tp_core import snmp
+from tp_core import ssh
 
-
-def snmpData():
-
+def getData():
     res = {}
     config = configparser.ConfigParser()
     config.read('config.ini')
@@ -19,7 +18,20 @@ def snmpData():
     for ip_address in ip_address_list:
         try:
             ip_address = ip_address.replace("\n", '')
-            _res = snmp.getLLDP(ip_address, comu_str)
+            _flag = snmp.sysDescr(ip_address, comu_str)
+            if 'Linux' in _flag or 'linux' in _flag:  # 是linux系统
+                if config["COMMON_AUTH"]["auth"] == 'true':
+                    uuid = json.loads(config["COMMON_AUTH"]["uuid"])[0].split('/')
+                    _res = ssh.getSSH(ip_address, uuid[0], uuid[1])
+                else:
+                    uuid = json.loads(config["LINUX"]["uuid"])
+                    for item in uuid:
+                        _item = item.split('/')
+                        if _item[0] == ip_address:
+                            _res = ssh.getSSH(ip_address, _item[1], _item[2])
+                            break
+            else:  # 不是linux系统，可能是交换机或者错误
+                _res = snmp.getLLDP(ip_address, comu_str)
         except:
             print("出现错误")
             exit(-1)
@@ -27,10 +39,5 @@ def snmpData():
             res.update({
                 snmp.getSysName(ip_address, comu_str): _res
             })
-    str_json = json.dumps(res, indent=2, ensure_ascii=False)
-    print(str_json)
-
-    return
-
-
-snmpData()
+    return res
+# getData()
